@@ -1,4 +1,4 @@
-package M2;
+
 
 public class Precision{
  public static void main(String[] args){
