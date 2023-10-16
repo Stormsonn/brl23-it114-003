@@ -130,6 +130,7 @@ public class NumberGuesser4 {
         if (guess == number) {
             win();
             pickNewRandom = true;
+            //Brl23 10/02/23
         } else {
             if (guess>number) {
                 System.out.println("That answer is too high");
