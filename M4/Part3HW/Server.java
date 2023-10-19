@@ -6,6 +6,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 
 public class Server {
     int port = 3001;
@@ -78,12 +79,44 @@ public class Server {
                     disconnect(client);
                     
                     break;
+                    //Brl23-10/18/23
+                }else{
+                    if (message.equalsIgnoreCase("flip") || message.equalsIgnoreCase("toss") || message.equalsIgnoreCase("coin")) {
+                        String result = flipCoin();
+                        broadcast(String.format("User[%d] flipped a coin and got %s", getId(), result), getId());
+                        return true;
+                    }
+                    // dice roll command
+                    if (message.matches("^roll \\d+d\\d+$")) {
+                        String[] tokens = message.split(" ");
+                        String[] diceTokens = tokens[1].split("d");
+                        int numDice = Integer.parseInt(diceTokens[0]);
+                        int numSides = Integer.parseInt(diceTokens[1]);
+                        String result = rollDice(numDice, numSides);
+                        broadcast(String.format("User[%d] rolled %s and got %s", getId(), tokens[1], result), getId());
+                        return true;
+                    }
+                    return false;}
                 }
             }
-            return true;
-        }
-        return false;
-    }
+
+                }
+            
+                private String flipCoin() {
+                    Random random = new Random();
+                    return random.nextBoolean() ? "heads" : "tails";
+                }
+            
+                private String rollDice(int numDice, int numSides) {
+                    Random random = new Random();
+                    int total = 0;
+                    for (int i = 0; i < numDice; i++) {
+                        total += random.nextInt(numSides) + 1;
+                    }
+                    return Integer.toString(total);
+                }
+    
+            
     public static void main(String[] args) {
         System.out.println("Starting Server");
         Server server = new Server();
