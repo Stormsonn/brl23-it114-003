@@ -4,13 +4,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import Project.common.Constants;
 import Project.common.Payload;
 import Project.common.PayloadType;
-import Project.common.RoomResultPayload;
 
 /**
  * A server-side representation of a single client
@@ -23,23 +19,13 @@ public class ServerThread extends Thread {
     // private Server server;// ref to our server so we can call methods on it
     // more easily
     private Room currentRoom;
-    private static Logger logger = Logger.getLogger(ServerThread.class.getName());
-    private long myClientId;
 
-    public void setClientId(long id) {
-        myClientId = id;
-    }
-
-    public long getClientId() {
-        return myClientId;
-    }
-
-    public boolean isRunning() {
-        return isRunning;
+    private void info(String message) {
+        System.out.println(String.format("Thread[%s]: %s", getId(), message));
     }
 
     public ServerThread(Socket myClient, Room room) {
-        logger.info("ServerThread created");
+        info("Thread created");
         // get communication channels to single client
         this.client = myClient;
         this.currentRoom = room;
@@ -48,13 +34,13 @@ public class ServerThread extends Thread {
 
     protected void setClientName(String name) {
         if (name == null || name.isBlank()) {
-            logger.warning("Invalid name being set");
+            System.err.println("Invalid client name being set");
             return;
         }
         clientName = name;
     }
 
-    public String getClientName() {
+    protected String getClientName() {
         return clientName;
     }
 
@@ -66,96 +52,45 @@ public class ServerThread extends Thread {
         if (room != null) {
             currentRoom = room;
         } else {
-            logger.info("Passed in room was null, this shouldn't happen");
+            info("Passed in room was null, this shouldn't happen");
         }
     }
 
     public void disconnect() {
-        sendConnectionStatus(myClientId, getClientName(), false);
-        logger.info("Thread being disconnected by server");
+        info("Thread being disconnected by server");
         isRunning = false;
         cleanup();
     }
 
     // send methods
-
-    public boolean sendReadyStatus(long clientId) {
-        Payload p = new Payload();
-        p.setPayloadType(PayloadType.READY);
-        p.setClientId(clientId);
-        return send(p);
-    }
-
-    public boolean sendRoomName(String name) {
-        Payload p = new Payload();
-        p.setPayloadType(PayloadType.JOIN_ROOM);
-        p.setMessage(name);
-        return send(p);
-    }
-
-    public boolean sendRoomsList(String[] rooms, String message) {
-        RoomResultPayload payload = new RoomResultPayload();
-        payload.setRooms(rooms);
-        if (message != null) {
-            payload.setMessage(message);
-        }
-        return send(payload);
-    }
-
-    public boolean sendExistingClient(long clientId, String clientName) {
-        Payload p = new Payload();
-        p.setPayloadType(PayloadType.SYNC_CLIENT);
-        p.setClientId(clientId);
-        p.setClientName(clientName);
-        return send(p);
-    }
-
-    public boolean sendResetUserList() {
-        Payload p = new Payload();
-        p.setPayloadType(PayloadType.RESET_USER_LIST);
-        return send(p);
-    }
-
-    public boolean sendClientId(long id) {
-        Payload p = new Payload();
-        p.setPayloadType(PayloadType.CLIENT_ID);
-        p.setClientId(id);
-        return send(p);
-    }
-
-    public boolean sendMessage(long clientId, String message) {
+    public boolean sendMessage(String from, String message) {
         Payload p = new Payload();
         p.setPayloadType(PayloadType.MESSAGE);
-        p.setClientId(clientId);
+        p.setClientName(from);
         p.setMessage(message);
         return send(p);
     }
-
-    public boolean sendConnectionStatus(long clientId, String who, boolean isConnected) {
+    public boolean sendConnectionStatus(String who, boolean isConnected){
         Payload p = new Payload();
-        p.setPayloadType(isConnected ? PayloadType.CONNECT : PayloadType.DISCONNECT);
-        p.setClientId(clientId);
+        p.setPayloadType(isConnected?PayloadType.CONNECT:PayloadType.DISCONNECT);
         p.setClientName(who);
-        p.setMessage(String.format("%s the room %s", (isConnected ? "Joined" : "Left"), currentRoom.getName()));
+        p.setMessage(isConnected?"connected":"disconnected");
         return send(p);
     }
 
     private boolean send(Payload payload) {
+        // added a boolean so we can see if the send was successful
         try {
-            logger.log(Level.FINE, "Outgoing payload: " + payload);
             out.writeObject(payload);
-            logger.log(Level.INFO, "Sent payload: " + payload);
             return true;
         } catch (IOException e) {
-            logger.info("Error sending message to client (most likely disconnected)");
-            // uncomment this to inspect the stack trace
+            info("Error sending message to client (most likely disconnected)");
+            // comment this out to inspect the stack trace
             // e.printStackTrace();
             cleanup();
             return false;
         } catch (NullPointerException ne) {
-            logger.info("Message was attempted to be sent before outbound stream was opened: " + payload);
-            // uncomment this to inspect the stack trace
-            // e.printStackTrace();
+            info("Message was attempted to be sent before outbound stream was opened");
             return true;// true since it's likely pending being opened
         }
     }
@@ -163,6 +98,7 @@ public class ServerThread extends Thread {
     // end send methods
     @Override
     public void run() {
+        info("Thread starting");
         try (ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
                 ObjectInputStream in = new ObjectInputStream(client.getInputStream());) {
             this.out = out;
@@ -173,49 +109,35 @@ public class ServerThread extends Thread {
                                                                      // likely mean a disconnect)
             ) {
 
-                logger.info("Received from client: " + fromClient);
-                processPayload(fromClient);
+                info("Received from client: " + fromClient);
+                processMessage(fromClient);
 
             } // close while loop
         } catch (Exception e) {
             // happens when client disconnects
             e.printStackTrace();
-            logger.info("Client disconnected");
+            info("Client disconnected");
         } finally {
             isRunning = false;
-            logger.info("Exited thread loop. Cleaning up connection");
+            info("Exited thread loop. Cleaning up connection");
             cleanup();
         }
     }
 
-    void processPayload(Payload p) {
+    void processMessage(Payload p) {
         switch (p.getPayloadType()) {
             case CONNECT:
                 setClientName(p.getClientName());
                 break;
-            case DISCONNECT:
-                Room.disconnectClient(this, getCurrentRoom());
+            case DISCONNECT://TBD
                 break;
             case MESSAGE:
                 if (currentRoom != null) {
                     currentRoom.sendMessage(this, p.getMessage());
                 } else {
                     // TODO migrate to lobby
-                    logger.log(Level.INFO, "Migrating to lobby on message with null room");
-                    Room.joinRoom(Constants.LOBBY, this);
+                    Room.joinRoom("lobby", this);
                 }
-                break;
-            case GET_ROOMS:
-                Room.getRooms(p.getMessage().trim(), this);
-                break;
-            case CREATE_ROOM:
-                Room.createRoom(p.getMessage().trim(), this);
-                break;
-            case JOIN_ROOM:
-                Room.joinRoom(p.getMessage().trim(), this);
-                break;
-            case READY:
-                // ((GameRoom) currentRoom).setReady(myClientId);
                 break;
             default:
                 break;
@@ -225,12 +147,12 @@ public class ServerThread extends Thread {
     }
 
     private void cleanup() {
-        logger.info("Thread cleanup() start");
+        info("Thread cleanup() start");
         try {
             client.close();
         } catch (IOException e) {
-            logger.info("Client already closed");
+            info("Client already closed");
         }
-        logger.info("Thread cleanup() complete");
+        info("Thread cleanup() complete");
     }
 }
