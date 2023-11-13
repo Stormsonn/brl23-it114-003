@@ -3,7 +3,7 @@
 ./common/Payload.java
 ./common/PayloadType.java
 ./common/RoomResultPayload.java
-./server/Gameroom.java
+./server/GameRoom.java
 ./server/Room.java
 ./server/Server.java
 ./server/ServerThread.java
