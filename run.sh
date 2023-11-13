@@ -1,4 +1,3 @@
-
 if [ "$2" = "server" ];
 then
 	java $1.server.Server
