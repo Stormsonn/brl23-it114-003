@@ -3,8 +3,10 @@ package Project.server;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import java.util.logging.Logger;
 
+import Project.client.Client;
 import Project.common.Constants;
 
 public class Room implements AutoCloseable {
@@ -96,6 +98,19 @@ public class Room implements AutoCloseable {
         }
     }
 
+        private String flip() {
+        Random random = new Random();
+        return random.nextBoolean() ? "heads" : "tails";
+    }
+
+    private String roll(int numDice, int numSides) {
+        Random random = new Random();
+        int total = 0;
+        for (int i = 0; i < numDice; i++) {
+            total += numDice*random.nextInt(numSides) + 1;
+        }
+        return Integer.toString(total);
+    }
     /***
      * Helper function to process messages to trigger different functionality.
      * 
@@ -107,7 +122,22 @@ public class Room implements AutoCloseable {
                 // change
     private boolean processCommands(String message, ServerThread client) {
 
-        
+        if (message.equalsIgnoreCase("flip") || message.equalsIgnoreCase("toss") || message.equalsIgnoreCase("coin")) {
+            String result = flip();
+            sendMessage(client, (String.format("flipped a coin and got %s", result, client.getClientId())));
+            return true;
+        }
+        // dice roll command
+        if (message.matches("^roll \\d+d\\d+$")) {
+            String[] tokens = message.split(" ");
+            String[] diceTokens = tokens[1].split("d");
+            int numDice = Integer.parseInt(diceTokens[0]);
+            int numSides = Integer.parseInt(diceTokens[1]);
+            String result = roll(numDice, numSides);
+            sendMessage(client,(String.format("rolled %s and got %s", result, client.getClientId())));
+            return true;
+        }
+    
 
         boolean wasCommand = false;
         try {

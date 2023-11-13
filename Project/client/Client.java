@@ -407,4 +407,8 @@ public enum Client {
         }
     }
 
+    public static Object getId() {
+        return null;
+    }
+
 }
