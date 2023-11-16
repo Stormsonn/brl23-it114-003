@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.logging.Logger;
 
-import Project.client.Client;
 import Project.common.Constants;
 
 public class Room implements AutoCloseable {
@@ -98,7 +97,7 @@ public class Room implements AutoCloseable {
         }
     }
 
-        private String flip() {
+    private String flip() {
         Random random = new Random();
         return random.nextBoolean() ? "heads" : "tails";
     }
@@ -107,10 +106,11 @@ public class Room implements AutoCloseable {
         Random random = new Random();
         int total = 0;
         for (int i = 0; i < numDice; i++) {
-            total += numDice*random.nextInt(numSides) + 1;
+            total += numDice * random.nextInt(numSides) + 1;
         }
         return Integer.toString(total);
     }
+
     /***
      * Helper function to process messages to trigger different functionality.
      * 
@@ -121,23 +121,6 @@ public class Room implements AutoCloseable {
     @Deprecated // not used in my project as of this lesson, keeping it here in case things
                 // change
     private boolean processCommands(String message, ServerThread client) {
-
-        if (message.equalsIgnoreCase("flip") || message.equalsIgnoreCase("toss") || message.equalsIgnoreCase("coin")) {
-            String result = flip();
-            sendMessage(client, (String.format("flipped a coin and got %s", result, client.getClientId())));
-            return true;
-        }
-        // dice roll command
-        if (message.matches("^roll \\d+d\\d+$")) {
-            String[] tokens = message.split(" ");
-            String[] diceTokens = tokens[1].split("d");
-            int numDice = Integer.parseInt(diceTokens[0]);
-            int numSides = Integer.parseInt(diceTokens[1]);
-            String result = roll(numDice, numSides);
-            sendMessage(client,(String.format("rolled %s and got %s", result, client.getClientId())));
-            return true;
-        }
-    
 
         boolean wasCommand = false;
         try {
@@ -161,6 +144,27 @@ public class Room implements AutoCloseable {
                     case LOGOUT:
                     case LOGOFF:
                         Room.disconnectClient(client, this);
+                        break;
+                    case "flip":
+                    case "toss":
+                    case "coin":
+                        String result = flip();
+                        sendMessage(client, (String.format("flipped a coin and got %s", result)));
+                        break;
+                    case "roll":
+                        String roll = comm2[1];
+                        // TODO don't forget your ucid-date comment
+                        // TODO check if roll is a single number or #d# format
+
+                        // TODO only do this if it's the #d# format
+                        String[] diceTokens = roll.split("d");
+                        // TODO probably want a try/catch to avoid crashing due to something like /roll
+                        // catddog
+                        int numDice = Integer.parseInt(diceTokens[0]);
+                        int numSides = Integer.parseInt(diceTokens[1]);
+                        String r = roll(numDice, numSides);
+                        sendMessage(client, (String.format("rolled %s and got %s", comm2[1], r)));
+
                         break;
                     default:
                         wasCommand = false;
@@ -224,6 +228,7 @@ public class Room implements AutoCloseable {
             // it was a command, don't broadcast
             return;
         }
+        // todo add formatting (i.e.,) message = formattedMessage(message)
         long from = sender == null ? Constants.DEFAULT_CLIENT_ID : sender.getClientId();
         Iterator<ServerThread> iter = clients.iterator();
         while (iter.hasNext()) {
