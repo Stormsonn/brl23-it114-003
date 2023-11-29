@@ -9,6 +9,7 @@ public class Payload implements Serializable {
     /**
      * Determines how to process the data on the receiver's side
      */
+    //Brl23-11/20/23
     private PayloadType payloadType;
 
     public PayloadType getPayloadType() {
@@ -23,21 +24,21 @@ public class Payload implements Serializable {
      * Who the payload is from
      */
     private String clientName;
-
+    //retrives a clients Name that they set
     public String getClientName() {
         return clientName;
     }
-
+    //sets the clients Name
     public void setClientName(String clientName) {
         this.clientName = clientName;
     }
 
     private long clientId;
-
+    //retrieves a clients ID
     public long getClientId() {
         return clientId;
     }
-
+    //sets a clients ID
     public void setClientId(long clientId) {
         this.clientId = clientId;
     }

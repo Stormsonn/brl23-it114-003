@@ -96,7 +96,7 @@ public class Room implements AutoCloseable {
             close();
         }
     }
-
+    //Brl23-11/20/23
     private String flip() {
         Random random = new Random();
         return random.nextBoolean() ? "heads" : "tails";
@@ -106,7 +106,7 @@ public class Room implements AutoCloseable {
         Random random = new Random();
         int total = 0;
         for (int i = 0; i < numDice; i++) {
-            total += numDice * random.nextInt(numSides) + 1;
+            total += random.nextInt(numSides) + 1;
         }
         return Integer.toString(total);
     }
@@ -145,31 +145,36 @@ public class Room implements AutoCloseable {
                     case LOGOFF:
                         Room.disconnectClient(client, this);
                         break;
+                    //Brl23-11/20/23
                     case "flip":
                     case "toss":
                     case "coin":
                         String result = flip();
                         sendMessage(client, (String.format("flipped a coin and got %s", result)));
                         break;
+                    //Brl23-11/20/23
                     case "roll":
                         String roll = comm2[1];
-                        // TODO don't forget your ucid-date comment
-                        // TODO check if roll is a single number or #d# format
-
-                        // TODO only do this if it's the #d# format
+                        
+                        if (roll.contains("d")) {
+                        
                         String[] diceTokens = roll.split("d");
-                        // TODO probably want a try/catch to avoid crashing due to something like /roll
-                        // catddog
+                        
                         int numDice = Integer.parseInt(diceTokens[0]);
                         int numSides = Integer.parseInt(diceTokens[1]);
                         String r = roll(numDice, numSides);
                         sendMessage(client, (String.format("rolled %s and got %s", comm2[1], r)));
-
+                    } else {
+                        int numSides= Integer.parseInt(roll);
+                        String r = roll(1, numSides);
+                        sendMessage(client, (String.format("rolled %s and got %s", comm2[1], r)));
+                    }
                         break;
                     default:
                         wasCommand = false;
                         break;
                 }
+                
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -210,7 +215,23 @@ public class Room implements AutoCloseable {
         room.removeClient(client);
     }
     // end command helper methods
+    //Brl23-11/27/23
+    private String formattedMessage(String message){
+    // Wrap text in * for bold
+    message = message.replaceAll("\\*(.*?)\\*", "<b>$1</b>");
 
+    // Wrap text in _ for italics
+    message = message.replaceAll("_(.*?)_", "<i>$1</i>");
+
+    // Wrap text in ~red()~ for red color
+    message = message.replaceAll("~red\\(([^)]+)\\)~", "<span style=\"color: red;\">$1</span>");
+    message = message.replaceAll("~green\\(([^)]+)\\)~", "<span style=\"color: green;\">$1</span>");
+    message = message.replaceAll("~blue\\(([^)]+)\\)~", "<span style=\"color: blue;\">$1</span>");
+
+    // Wrap text in ` for underline
+    message = message.replaceAll("`([^`]+)`", "<u>$1</u>");
+        return message;
+    }
     /***
      * Takes a sender and a message and broadcasts the message to all clients in
      * this room. Client is mostly passed for command purposes but we can also use
@@ -228,6 +249,7 @@ public class Room implements AutoCloseable {
             // it was a command, don't broadcast
             return;
         }
+        message=formattedMessage(message);
         // todo add formatting (i.e.,) message = formattedMessage(message)
         long from = sender == null ? Constants.DEFAULT_CLIENT_ID : sender.getClientId();
         Iterator<ServerThread> iter = clients.iterator();
