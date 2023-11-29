@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.logging.Logger;
 
-import Project.client.Client;
 import Project.common.Constants;
 
 public class Room implements AutoCloseable {
@@ -97,8 +96,8 @@ public class Room implements AutoCloseable {
             close();
         }
     }
-
-        private String flip() {
+    //Brl23-11/20/23
+    private String flip() {
         Random random = new Random();
         return random.nextBoolean() ? "heads" : "tails";
     }
@@ -107,10 +106,11 @@ public class Room implements AutoCloseable {
         Random random = new Random();
         int total = 0;
         for (int i = 0; i < numDice; i++) {
-            total += numDice*random.nextInt(numSides) + 1;
+            total += random.nextInt(numSides) + 1;
         }
         return Integer.toString(total);
     }
+
     /***
      * Helper function to process messages to trigger different functionality.
      * 
@@ -121,23 +121,6 @@ public class Room implements AutoCloseable {
     @Deprecated // not used in my project as of this lesson, keeping it here in case things
                 // change
     private boolean processCommands(String message, ServerThread client) {
-
-        if (message.equalsIgnoreCase("flip") || message.equalsIgnoreCase("toss") || message.equalsIgnoreCase("coin")) {
-            String result = flip();
-            sendMessage(client, (String.format("flipped a coin and got %s", result, client.getClientId())));
-            return true;
-        }
-        // dice roll command
-        if (message.matches("^roll \\d+d\\d+$")) {
-            String[] tokens = message.split(" ");
-            String[] diceTokens = tokens[1].split("d");
-            int numDice = Integer.parseInt(diceTokens[0]);
-            int numSides = Integer.parseInt(diceTokens[1]);
-            String result = roll(numDice, numSides);
-            sendMessage(client,(String.format("rolled %s and got %s", result, client.getClientId())));
-            return true;
-        }
-    
 
         boolean wasCommand = false;
         try {
@@ -162,10 +145,36 @@ public class Room implements AutoCloseable {
                     case LOGOFF:
                         Room.disconnectClient(client, this);
                         break;
+                    //Brl23-11/20/23
+                    case "flip":
+                    case "toss":
+                    case "coin":
+                        String result = flip();
+                        sendMessage(client, (String.format("flipped a coin and got %s", result)));
+                        break;
+                    //Brl23-11/20/23
+                    case "roll":
+                        String roll = comm2[1];
+                        
+                        if (roll.contains("d")) {
+                        
+                        String[] diceTokens = roll.split("d");
+                        
+                        int numDice = Integer.parseInt(diceTokens[0]);
+                        int numSides = Integer.parseInt(diceTokens[1]);
+                        String r = roll(numDice, numSides);
+                        sendMessage(client, (String.format("rolled %s and got %s", comm2[1], r)));
+                    } else {
+                        int numSides= Integer.parseInt(roll);
+                        String r = roll(1, numSides);
+                        sendMessage(client, (String.format("rolled %s and got %s", comm2[1], r)));
+                    }
+                        break;
                     default:
                         wasCommand = false;
                         break;
                 }
+                
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -206,7 +215,23 @@ public class Room implements AutoCloseable {
         room.removeClient(client);
     }
     // end command helper methods
+    //Brl23-11/27/23
+    private String formattedMessage(String message){
+    // Wrap text in * for bold
+    message = message.replaceAll("\\*(.*?)\\*", "<b>$1</b>");
 
+    // Wrap text in _ for italics
+    message = message.replaceAll("_(.*?)_", "<i>$1</i>");
+
+    // Wrap text in ~red()~ for red color
+    message = message.replaceAll("~red\\(([^)]+)\\)~", "<span style=\"color: red;\">$1</span>");
+    message = message.replaceAll("~green\\(([^)]+)\\)~", "<span style=\"color: green;\">$1</span>");
+    message = message.replaceAll("~blue\\(([^)]+)\\)~", "<span style=\"color: blue;\">$1</span>");
+
+    // Wrap text in ` for underline
+    message = message.replaceAll("`([^`]+)`", "<u>$1</u>");
+        return message;
+    }
     /***
      * Takes a sender and a message and broadcasts the message to all clients in
      * this room. Client is mostly passed for command purposes but we can also use
@@ -224,6 +249,8 @@ public class Room implements AutoCloseable {
             // it was a command, don't broadcast
             return;
         }
+        message=formattedMessage(message);
+        // todo add formatting (i.e.,) message = formattedMessage(message)
         long from = sender == null ? Constants.DEFAULT_CLIENT_ID : sender.getClientId();
         Iterator<ServerThread> iter = clients.iterator();
         while (iter.hasNext()) {

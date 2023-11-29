@@ -146,8 +146,8 @@ public enum Server {
             return false;
         } else {
             // TODO, all non-lobby rooms will be games
-            // Room room = new Room(roomName); //chatroom project can just use regular rooms
-            GameRoom room = new GameRoom(roomName); // all other projects
+            Room room = new Room(roomName); // chatroom project can just use regular rooms
+            // GameRoom room = new GameRoom(roomName); // all other projects
             rooms.add(room);
             logger.info(String.format("Created new room %s", roomName));
             return true;
