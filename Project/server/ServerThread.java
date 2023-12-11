@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,6 +27,8 @@ public class ServerThread extends Thread {
     private Room currentRoom;
     private static Logger logger = Logger.getLogger(ServerThread.class.getName());
     private long myClientId;
+    //Brl23-12/11/23
+    private Set<String> mutedUsers = new HashSet<>();
 
     public void setClientId(long id) {
         myClientId = id;
@@ -161,32 +165,6 @@ public class ServerThread extends Thread {
     }
 
     // end send methods
-    @Override
-    public void run() {
-        try (ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
-                ObjectInputStream in = new ObjectInputStream(client.getInputStream());) {
-            this.out = out;
-            isRunning = true;
-            Payload fromClient;
-            while (isRunning && // flag to let us easily control the loop
-                    (fromClient = (Payload) in.readObject()) != null // reads an object from inputStream (null would
-                                                                     // likely mean a disconnect)
-            ) {
-
-                logger.info("Received from client: " + fromClient);
-                processPayload(fromClient);
-
-            } // close while loop
-        } catch (Exception e) {
-            // happens when client disconnects
-            e.printStackTrace();
-            logger.info("Client disconnected");
-        } finally {
-            isRunning = false;
-            logger.info("Exited thread loop. Cleaning up connection");
-            cleanup();
-        }
-    }
 
     void processPayload(Payload p) {
         switch (p.getPayloadType()) {
@@ -222,6 +200,66 @@ public class ServerThread extends Thread {
 
         }
 
+    }
+    //Muting/Unmuting
+    public boolean muteUser(String name) {
+        if (mutedUsers.contains(name)) {
+            return false; // Already muted
+        }
+
+        mutedUsers.add(name);
+        return true;
+    }
+
+    // Unmuting
+    public boolean unmuteUser(String name) {
+        if (!mutedUsers.contains(name)) {
+            return false; // Not muted
+        }
+
+        mutedUsers.remove(name);
+        return true;
+    }
+
+    // Check if a user is muted
+    public boolean isUserMuted(long targetClientId) {
+        return mutedUsers.contains(targetClientId);
+    }
+
+    // end send methods
+    @Override
+    public void run() {
+        try (ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
+                ObjectInputStream in = new ObjectInputStream(client.getInputStream());) {
+            this.out = out;
+            isRunning = true;
+            Payload fromClient;
+            while (isRunning && (fromClient = (Payload) in.readObject()) != null) {
+                logger.info("Received from client: " + fromClient);
+                if (!isUserMuted(fromClient.getClientId())) {
+                    processPayload(fromClient);
+                } else {
+                    sendMutedUserMessage(fromClient.getClientId());
+                }
+            }
+        } catch (Exception e) {
+            // Handle exceptions
+            e.printStackTrace();
+        } finally {
+            isRunning = false;
+            logger.info("Exited thread loop. Cleaning up connection");
+            cleanup();
+        }
+    }
+    private void sendMutedUserMessage(long mutedUserId) {
+        String message = "You are muted and cannot perform this action.";
+        Payload mutedUserMessagePayload = new Payload();
+        mutedUserMessagePayload.setPayloadType(PayloadType.MUTED_USER);
+        mutedUserMessagePayload.setMessage(message);
+        sendMessage(mutedUserId, mutedUserMessagePayload);
+    }
+
+    private void sendMessage(long mutedUserId, Payload mutedUserMessagePayload) {
     }
 
     private void cleanup() {

@@ -25,11 +25,11 @@ public enum Client {
     private Thread inputThread;
     private Thread fromServerThread;
     // private String clientName = "";
-    private ClientPlayer myPlayer = new ClientPlayer();
+    private User myPlayer = new User();
     private long myClientId = Constants.DEFAULT_CLIENT_ID;
     private static Logger logger = Logger.getLogger(Client.class.getName());
 
-    private Hashtable<Long, ClientPlayer> userList = new Hashtable<Long, ClientPlayer>();
+    private Hashtable<Long, User> userList = new Hashtable<Long, User>();
 
     private static IClientEvents events;
 
@@ -170,6 +170,79 @@ public enum Client {
      * 
      * @param p
      */
+    private void processPayload(Payload p) {
+        switch (p.getPayloadType()) {
+            case CONNECT:
+                if (!userList.containsKey(p.getClientId())) {
+                    User cp = new User();
+                    cp.setClientName(p.getClientName());
+                    cp.setClientId(p.getClientId());
+                    userList.put(p.getClientId(), cp);
+                }
+                System.out.println(String.format("*%s %s*",
+                        p.getClientName(),
+                        p.getMessage()));
+                events.onClientConnect(p.getClientId(), p.getClientName(), p.getMessage());
+                break;
+            case DISCONNECT:
+                if (userList.containsKey(p.getClientId())) {
+                    userList.remove(p.getClientId());
+                }
+                if (p.getClientId() == myClientId) {
+                    myClientId = Constants.DEFAULT_CLIENT_ID;
+                }
+                System.out.println(String.format("*%s %s*",
+                        p.getClientName(),
+                        p.getMessage()));
+                events.onClientDisconnect(p.getClientId(), p.getClientName(), p.getMessage());
+                break;
+            case SYNC_CLIENT:
+                if (!userList.containsKey(p.getClientId())) {
+                    User cp = new User();
+                    cp.setClientName(p.getClientName());
+                    cp.setClientId(p.getClientId());
+                    userList.put(p.getClientId(), cp);
+                }
+                events.onSyncClient(p.getClientId(), p.getClientName());
+                break;
+            case MESSAGE:
+                System.out.println(String.format("%s: %s",
+                        getClientNameById(p.getClientId()),
+                        p.getMessage()));
+                events.onMessageReceive(p.getClientId(), p.getMessage());
+                break;
+            case CLIENT_ID:
+                if (myClientId == Constants.DEFAULT_CLIENT_ID) {
+                    myClientId = p.getClientId();
+                    myPlayer.setClientId(myClientId);
+                    userList.put(myClientId, myPlayer);
+                } else {
+                    logger.warning("Receiving client id despite already being set");
+                }
+                events.onReceiveClientId(p.getClientId());
+                break;
+            case GET_ROOMS:
+                RoomResultPayload rp = (RoomResultPayload) p;
+                System.out.println("Received Room List:");
+                if (rp.getMessage() != null) {
+                    System.out.println(rp.getMessage());
+                } else {
+                    for (int i = 0, l = rp.getRooms().length; i < l; i++) {
+                        System.out.println(String.format("%s) %s", (i + 1), rp.getRooms()[i]));
+                    }
+                }
+                events.onReceiveRoomList(rp.getRooms(), rp.getMessage());
+                break;
+            case RESET_USER_LIST:
+                userList.clear();
+                events.onResetUserList();
+                break;
+            default:
+                logger.warning(String.format("Unhandled Payload type: %s", p.getPayloadType()));
+                break;
+
+        }
+    }
 
     private void close() {
         myClientId = Constants.DEFAULT_CLIENT_ID;
