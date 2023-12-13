@@ -22,6 +22,8 @@ public class Room implements AutoCloseable {
     private final static String DISCONNECT = "disconnect";
     private final static String LOGOUT = "logout";
     private final static String LOGOFF = "logoff";
+    private final static String MUTE ="mute";
+    private final static String UNMUTE ="unmute";
     private static Logger logger = Logger.getLogger(Room.class.getName());
 
     public Room(String name) {
@@ -150,7 +152,7 @@ public class Room implements AutoCloseable {
                     case "toss":
                     case "coin":
                         String result = flip();
-                        sendMessage(client, (String.format("flipped a coin and got %s", result)));
+                        sendMessage(client, (String.format("_flipped a coin and got %s_", result)));
                         break;
                     //Brl23-11/20/23
                     case "roll":
@@ -163,24 +165,61 @@ public class Room implements AutoCloseable {
                         int numDice = Integer.parseInt(diceTokens[0]);
                         int numSides = Integer.parseInt(diceTokens[1]);
                         String r = roll(numDice, numSides);
-                        sendMessage(client, (String.format("rolled %s and got %s", comm2[1], r)));
+                        sendMessage(client, (String.format("_rolled %s and got %s_", comm2[1], r)));
                     } else {
                         int numSides= Integer.parseInt(roll);
                         String r = roll(1, numSides);
-                        sendMessage(client, (String.format("rolled %s and got %s", comm2[1], r)));
+                        sendMessage(client, (String.format("_rolled %s and got %s_", comm2[1], r)));
                     }
                         break;
-                    default:
-                        wasCommand = false;
+                    //Brl23-12/11/23
+                    case MUTE:
+                        client.muteUser(comm2[1]);
                         break;
-                }
-                
+                    case UNMUTE:
+                        client.unmuteUser(comm2[1]);
+                        break;
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+
+            //Private message
+        } else if (message.startsWith("@")) {
+            // Private message handling
+            int spaceIndex = message.indexOf(" ");
+            if (spaceIndex != -1) {
+                String username = message.substring(1, spaceIndex);
+                String privateMessage = message.substring(spaceIndex + 1);
+                sendPrivateMessage(client, username, privateMessage);
+                wasCommand = true;
+            }
         }
-        return wasCommand;
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+    return wasCommand;
+}
+//Brl23-12/13/23
+private void sendPrivateMessage(ServerThread sender, String username, String message) {
+    for (ServerThread recipient : clients) {
+        if (recipient.getClientName().equals(username)) {
+            
+            //boolean isSenderMuted = sender.isUserMuted(recipient.getClientName());
+            boolean isRecipientMuted = recipient.isUserMuted(sender.getClientName());
+            
+            if (!isRecipientMuted) {
+                recipient.sendMessage(sender.getClientId(), String.format("@%s: %s", sender.getClientName(), message));
+                sender.sendMessage(recipient.getClientId(), String.format("Sent a private message to @%s: %s", username, message));
+            } else {
+                System.out.println("Private message not sent due to muting. Sender ID: " + sender.getClientName() + ", Recipient ID: " + recipient.getClientName());
+            }
+            
+            return;
+        }
+    }
+
+
+    // If the loop completes and no recipient is found, notify the sender
+    sender.sendMessage(sender.getClientId(),String.format("User @%s not found or not online.", username));
+}
 
     // Command helper methods
     protected static void getRooms(String query, ServerThread client) {
@@ -240,6 +279,7 @@ public class Room implements AutoCloseable {
      * @param sender  The client sending the message
      * @param message The message to broadcast inside the room
      */
+    //Brl23-12/13/23
     protected synchronized void sendMessage(ServerThread sender, String message) {
         if (!isRunning) {
             return;
@@ -254,10 +294,19 @@ public class Room implements AutoCloseable {
         long from = sender == null ? Constants.DEFAULT_CLIENT_ID : sender.getClientId();
         Iterator<ServerThread> iter = clients.iterator();
         while (iter.hasNext()) {
-            ServerThread client = iter.next();
-            boolean messageSent = client.sendMessage(from, message);
-            if (!messageSent) {
+        ServerThread client = iter.next();
+        // Check if the target client is muted
+        String targetClientID = client.getClientName();
+        boolean isTargetMuted = client.isUserMuted(sender.getClientName());
+        if (!isTargetMuted) {
+             boolean messageSent = client.sendMessage(from, message);
+             if (!messageSent) {
                 handleDisconnect(iter, client);
+                continue;
+            }
+            } else {
+                System.out.println("Message not sent to muted user with ID: " + targetClientID);
+
             }
         }
     }
