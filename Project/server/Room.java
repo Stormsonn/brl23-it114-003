@@ -197,15 +197,25 @@ public class Room implements AutoCloseable {
     }
     return wasCommand;
 }
-
+//Brl23-12/13/23
 private void sendPrivateMessage(ServerThread sender, String username, String message) {
     for (ServerThread recipient : clients) {
         if (recipient.getClientName().equals(username)) {
-            recipient.sendMessage(sender.getClientId(),String.format("@%s: %s", sender.getClientId(), message));
-            sender.sendMessage(sender.getClientId(),String.format("Sent a private message to @%s: %s", username, message));
+            
+            //boolean isSenderMuted = sender.isUserMuted(recipient.getClientName());
+            boolean isRecipientMuted = recipient.isUserMuted(sender.getClientName());
+            
+            if (!isRecipientMuted) {
+                recipient.sendMessage(sender.getClientId(), String.format("@%s: %s", sender.getClientName(), message));
+                sender.sendMessage(recipient.getClientId(), String.format("Sent a private message to @%s: %s", username, message));
+            } else {
+                System.out.println("Private message not sent due to muting. Sender ID: " + sender.getClientName() + ", Recipient ID: " + recipient.getClientName());
+            }
+            
             return;
         }
     }
+
 
     // If the loop completes and no recipient is found, notify the sender
     sender.sendMessage(sender.getClientId(),String.format("User @%s not found or not online.", username));
@@ -269,6 +279,7 @@ private void sendPrivateMessage(ServerThread sender, String username, String mes
      * @param sender  The client sending the message
      * @param message The message to broadcast inside the room
      */
+    //Brl23-12/13/23
     protected synchronized void sendMessage(ServerThread sender, String message) {
         if (!isRunning) {
             return;
@@ -283,10 +294,19 @@ private void sendPrivateMessage(ServerThread sender, String username, String mes
         long from = sender == null ? Constants.DEFAULT_CLIENT_ID : sender.getClientId();
         Iterator<ServerThread> iter = clients.iterator();
         while (iter.hasNext()) {
-            ServerThread client = iter.next();
-            boolean messageSent = client.sendMessage(from, message);
-            if (!messageSent) {
+        ServerThread client = iter.next();
+        // Check if the target client is muted
+        String targetClientID = client.getClientName();
+        boolean isTargetMuted = client.isUserMuted(sender.getClientName());
+        if (!isTargetMuted) {
+             boolean messageSent = client.sendMessage(from, message);
+             if (!messageSent) {
                 handleDisconnect(iter, client);
+                continue;
+            }
+            } else {
+                System.out.println("Message not sent to muted user with ID: " + targetClientID);
+
             }
         }
     }

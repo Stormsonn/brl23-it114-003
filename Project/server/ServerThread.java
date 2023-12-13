@@ -18,6 +18,7 @@ import Project.common.RoomResultPayload;
  * A server-side representation of a single client
  */
 public class ServerThread extends Thread {
+    public static final String isuserMuted = null;
     private Socket client;
     private String clientName;
     private boolean isRunning = false;
@@ -222,10 +223,9 @@ public class ServerThread extends Thread {
     }
 
     // Check if a user is muted
-    public boolean isUserMuted(long targetClientId) {
-        return mutedUsers.contains(targetClientId);
+    public boolean isUserMuted(String targetClientID){
+        return mutedUsers.contains(targetClientID);
     }
-
     // end send methods
     @Override
     public void run() {
@@ -236,7 +236,7 @@ public class ServerThread extends Thread {
             Payload fromClient;
             while (isRunning && (fromClient = (Payload) in.readObject()) != null) {
                 logger.info("Received from client: " + fromClient);
-                if (!isUserMuted(fromClient.getClientId())) {
+                if (!isUserMuted(fromClient.getClientName())) {
                     processPayload(fromClient);
                 } else {
                     sendMutedUserMessage(fromClient.getClientId());
